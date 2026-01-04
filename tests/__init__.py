@@ -1,0 +1,1 @@
+"""QuantiaMagica Test Suite."""

@@ -1,0 +1,13 @@
+# QuantiaMagica Dependencies
+# Install with: pip install -r requirements.txt
+
+# Core dependencies
+numpy>=1.20.0
+matplotlib>=3.4.0
+
+# Optional: Development dependencies
+# pytest>=7.0.0
+# pytest-cov>=4.0.0
+# black>=22.0.0
+# flake8>=5.0.0
+# mypy>=0.990
