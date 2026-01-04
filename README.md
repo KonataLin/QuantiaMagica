@@ -62,10 +62,12 @@ adc = SARADC(bits=12, vref=1.0)
 def add_noise(event):
     event.voltage += np.random.normal(0, 100e-6)
 
-# 添加电容失配
+# 添加电容失配 (固定失配值，在初始化时生成)
+cap_mismatch_values = {i: np.random.normal(0, 0.005) for i in range(12)}
+
 @adc.on(CapacitorSwitchEvent)
 def cap_mismatch(event):
-    event.capacitance_actual *= 1 + np.random.normal(0, 0.005)
+    event.capacitance_actual *= 1 + cap_mismatch_values[event.bit_index]
 
 adc.sim()
 print(f"ENOB: {adc.enob():.2f} bits")
