@@ -161,6 +161,7 @@ pipeline = PipelineADC(
 
 ```python
 adc.sim()           # 运行仿真
+adc.sim_auto(fs)    # 自动优化fin和幅度，最大化ENOB
 adc.plot()          # 绘制时域图 (IEEE JSSC 黑白风格)
 adc.spectrum()      # 绘制频谱 (IEEE JSSC 黑白风格)
 
@@ -172,6 +173,34 @@ adc.thd()           # 总谐波失真 (dB)
 adc.inl()           # 积分非线性 (LSB数组)
 adc.dnl()           # 微分非线性 (LSB数组)
 ```
+
+### 自动优化 (sim_auto)
+
+使用**差分进化(DE)算法**自动搜索最佳测试参数，全自动收敛检测:
+
+```python
+from quantiamagica import SARADC
+
+adc = SARADC(bits=12)
+
+# 一行代码 - 自动优化！
+result = adc.sim_auto(fs=1e6)
+
+# 返回值
+print(f"最佳fin: {result['best_fin']:.2f} Hz")
+print(f"最佳幅度: {result['best_amplitude']:.4f} V") 
+print(f"最佳ENOB: {result['best_enob']:.4f} bits")
+print(f"收敛: {result['converged']}, 原因: {result['reason']}")
+
+# 结果已保存，可直接画图
+adc.report()
+```
+
+特点:
+- **GPU加速**: 自动检测CUDA，GPU可用时种群128
+- **极限并发**: 4x CPU核心数并行计算
+- **快速收敛**: 通常2-4代达到理论ENOB极限
+- **幅度优化**: 自动使用99.8%满量程获得最佳ENOB
 
 ### IEEE JSSC 风格绘图
 

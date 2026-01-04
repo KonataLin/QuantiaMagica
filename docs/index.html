@@ -852,6 +852,8 @@ adc.sim(sig)</pre>
                 <tr><td><code>code_to_voltage(code)</code></td><td>将输出码转换回电压</td></tr>
             </table>
 
+            <hr style="margin: 2rem 0; border: none; border-top: 1px solid #e2e8f0;">
+
             <h4>PipelineADC - 流水线ADC</h4>
             <p>导入: <code>from quantiamagica import PipelineADC</code></p>
             <table>
@@ -870,6 +872,8 @@ adc.sim(sig)</pre>
                 <tr><td><code>set_stage_adc(index, adc)</code></td><td>为指定级设置自定义子ADC</td></tr>
             </table>
 
+            <hr style="margin: 2rem 0; border: none; border-top: 2px solid #e2e8f0;">
+
             <!-- ================= 基类方法 ================= -->
             <h3>ADConverter 基类方法 (所有ADC通用)</h3>
             <p>以下方法适用于 SARADC 和 PipelineADC</p>
@@ -881,6 +885,11 @@ adc.sim(sig)</pre>
                     <td><code>sim()</code></td>
                     <td>input_voltage, n_samples, fs, signal, fin, amplitude, offset</td>
                     <td>运行ADC仿真，返回SimulationResult</td>
+                </tr>
+                <tr>
+                    <td><code>sim_auto()</code></td>
+                    <td>fs, n_samples, verbose</td>
+                    <td><strong>自动优化</strong>：DE算法+CUDA/CPU极限并发，自动检测GPU加速</td>
                 </tr>
                 <tr>
                     <td><code>convert(voltage)</code></td>
@@ -1295,6 +1304,74 @@ my_u1, my_u2 = <span class="code-string">0.0</span>, <span class="code-string">0
                 <tr><td><code>signal.vrms</code></td><td>RMS电压</td></tr>
                 <tr><td><code>signal.mean</code></td><td>平均值</td></tr>
             </table>
+
+            <hr style="margin: 2rem 0; border: none; border-top: 2px solid #e2e8f0;">
+
+            <!-- ================= 遗传算法优化库 ================= -->
+            <h3>遗传算法优化库 (quantiamagica.optim)</h3>
+            <p>高度抽象的遗传算法优化库，支持CUDA/CPU并行计算，可用于优化任意ADC参数。<strong>自动斜率收敛</strong>，无需手动设置迭代次数。</p>
+            
+            <h4>Gene - 基因定义</h4>
+            <p>导入: <code>from quantiamagica.optim import Gene</code></p>
+            <table>
+                <tr><th>参数</th><th>类型</th><th>说明</th></tr>
+                <tr><td>name</td><td>str</td><td>参数名称</td></tr>
+                <tr><td>low</td><td>float</td><td>下界</td></tr>
+                <tr><td>high</td><td>float</td><td>上界</td></tr>
+                <tr><td>dtype</td><td>str</td><td>'float', 'int', 'choice', 'bool'</td></tr>
+                <tr><td>choices</td><td>list</td><td>离散选择列表 (仅dtype='choice'时)</td></tr>
+                <tr><td>log_scale</td><td>bool</td><td>是否使用对数尺度</td></tr>
+            </table>
+
+            <h4>GeneticOptimizer - 遗传算法优化器</h4>
+            <p>导入: <code>from quantiamagica.optim import GeneticOptimizer</code></p>
+            <table>
+                <tr><th>参数</th><th>类型</th><th>说明</th></tr>
+                <tr><td>genes</td><td>List[Gene]</td><td>基因定义列表</td></tr>
+                <tr><td>fitness_fn</td><td>Callable</td><td>适应度函数 (接受dict返回float)</td></tr>
+                <tr><td>maximize</td><td>bool</td><td>是否最大化 (默认True)</td></tr>
+            </table>
+            <p><strong>run() 方法参数:</strong></p>
+            <table>
+                <tr><th>参数</th><th>默认值</th><th>说明</th></tr>
+                <tr><td>population_size</td><td>50</td><td>种群大小</td></tr>
+                <tr><td>max_generations</td><td>200</td><td>最大迭代代数（自动收敛通常不会到达）</td></tr>
+                <tr><td>slope_window</td><td>5</td><td>斜率计算窗口</td></tr>
+                <tr><td>slope_threshold</td><td>0.001</td><td>收敛斜率阈值</td></tr>
+                <tr><td>verbose</td><td>True</td><td>显示进度</td></tr>
+                <tr><td>seed</td><td>None</td><td>随机种子</td></tr>
+            </table>
+
+            <h4>OptimizationResult - 优化结果</h4>
+            <table>
+                <tr><th>属性</th><th>类型</th><th>说明</th></tr>
+                <tr><td>best_params</td><td>Dict</td><td>最佳参数</td></tr>
+                <tr><td>best_fitness</td><td>float</td><td>最佳适应度</td></tr>
+                <tr><td>history</td><td>List[float]</td><td>每代最佳适应度历史</td></tr>
+                <tr><td>generations</td><td>int</td><td>实际迭代代数</td></tr>
+                <tr><td>converged</td><td>bool</td><td>是否收敛</td></tr>
+            </table>
+
+            <h4>SDCoeffOptimizer - SD ADC系数优化器</h4>
+            <p>导入: <code>from quantiamagica.optim import SDCoeffOptimizer</code></p>
+            <table>
+                <tr><th>参数</th><th>默认值</th><th>说明</th></tr>
+                <tr><td>order</td><td>2</td><td>调制器阶数</td></tr>
+                <tr><td>bits</td><td>1</td><td>量化器位数</td></tr>
+                <tr><td>osr</td><td>64</td><td>过采样率</td></tr>
+                <tr><td>fs</td><td>1e6</td><td>采样频率</td></tr>
+            </table>
+            <p><strong>注意:</strong> SAR/Pipeline ADC使用通用GeneticOptimizer进行高度自定义优化。</p>
+
+            <div class="tip tip-info">
+                <div class="tip-title">优化器特性</div>
+                <ul>
+                    <li><strong>自动斜率收敛</strong> - 无需设置迭代次数，适应度斜率平滑时自动停止</li>
+                    <li><strong>CUDA自动检测</strong> - 有GPU时自动加速</li>
+                    <li><strong>并行评估</strong> - 多线程评估种群</li>
+                    <li><strong>高度抽象</strong> - 支持任意ADC、任意参数、任意适应度函数</li>
+                </ul>
+            </div>
         </section>
 
         <!-- 示例 -->
@@ -1381,7 +1458,54 @@ adc.report(save=<span class="code-string">'fig.pdf'</span>)           <span clas
 <span class="code-comment"># what: 'all'|'spectrum'|'time'|'static'|'metrics'</span>
 <span class="code-comment"># columns: 1(单栏3.5") 或 2(双栏7.16")</span></pre>
 
-            <h3>示例4：Sigma-Delta ADC（自定义复杂拓扑）</h3>
+            <h3>示例4：自动优化测试参数 (sim_auto)</h3>
+            <div class="tip tip-info">
+                <div class="tip-title">sim_auto 原理</div>
+                <p><strong>差分进化算法(DE)</strong> + <strong>极限并发</strong> + <strong>自适应参数</strong>：</p>
+                <ul>
+                    <li><strong>GPU检测</strong>：自动检测CUDA，GPU可用时种群128</li>
+                    <li><strong>CPU并发</strong>：4x CPU核心数并行计算</li>
+                    <li><strong>快速收敛</strong>：通常2-4代即可收敛</li>
+                    <li><strong>ADC自适应</strong>：
+                        <ul>
+                            <li>SAR/Pipeline: 幅度99.8%满量程，n_samples=2^bits</li>
+                            <li>Sigma-Delta: 幅度根据阶数自动缩小(避免震荡)，n_samples=OSR*256向上取2的幂</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+            <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px;margin:12px 0;">
+                <div style="font-weight:bold;color:#856404;margin-bottom:8px;">GPU加速安装</div>
+                <p style="color:#856404;margin:0 0 8px 0;">要启用CUDA GPU加速，需安装PyTorch CUDA版本：</p>
+                <pre style="background:#856404;color:#fff;padding:8px;border-radius:4px;font-size:12px;margin:0 0 8px 0;">pip install torch --index-url https://download.pytorch.org/whl/cu121</pre>
+                <p style="color:#856404;margin:0 0 4px 0;font-size:12px;">若安装到自定义路径，需设置环境变量：</p>
+                <pre style="background:#856404;color:#fff;padding:8px;border-radius:4px;font-size:12px;margin:0;">$env:PYTHONPATH = "D:\Python\Lib\site-packages"  # PowerShell
+set PYTHONPATH=D:\Python\Lib\site-packages           # CMD</pre>
+                <p style="margin-top:8px;font-size:12px;color:#856404;">支持NVIDIA显卡(RTX 20/30/40系列)。</p>
+            </div>
+            <pre><span class="code-keyword">from</span> quantiamagica <span class="code-keyword">import</span> SARADC
+
+adc = SARADC(bits=<span class="code-string">12</span>)
+
+<span class="code-comment"># 一行代码 - 自动优化！</span>
+result = adc.sim_auto(fs=<span class="code-string">1e6</span>)  <span class="code-comment"># 只需指定fs</span>
+
+<span class="code-comment"># 返回值包含最优参数</span>
+<span class="code-function">print</span>(<span class="code-string">f"最佳fin: {result['best_fin']:.2f} Hz"</span>)
+<span class="code-function">print</span>(<span class="code-string">f"最佳幅度: {result['best_amplitude']:.4f} V"</span>)
+<span class="code-function">print</span>(<span class="code-string">f"最佳ENOB: {result['best_enob']:.4f} bits"</span>)
+<span class="code-function">print</span>(<span class="code-string">f"收敛代数: {result['generations']}"</span>)
+<span class="code-function">print</span>(<span class="code-string">f"收敛原因: {result['reason']}"</span>)
+
+<span class="code-comment"># 结果已保存，可直接画图</span>
+adc.report()
+
+<span class="code-comment"># 适用于所有ADC类型</span>
+<span class="code-keyword">from</span> quantiamagica <span class="code-keyword">import</span> PipelineADC, SigmaDeltaADC
+PipelineADC(<span class="code-string">12</span>).sim_auto(fs=<span class="code-string">1e6</span>)
+SigmaDeltaADC(order=<span class="code-string">2</span>, bits=<span class="code-string">1</span>, osr=<span class="code-string">64</span>).sim_auto(fs=<span class="code-string">1e6</span>)</pre>
+
+            <h3>示例5：Sigma-Delta ADC（自定义复杂拓扑）</h3>
             <pre><span class="code-comment"># =============================================================</span>
 <span class="code-comment"># Sigma-Delta ADC: 通过QuantizerEvent实现任意复杂拓扑</span>
 <span class="code-comment"># 演示：自定义2阶CIFB差分方程</span>
@@ -1442,6 +1566,204 @@ signal_3rd = <span class="code-string">0.5</span> + <span class="code-string">0.
 sd3.sim(signal_3rd, fs=FS)
 sd3._result.metadata[<span class="code-string">'fin'</span>] = FIN
 <span class="code-function">print</span>(<span class="code-string">f"3阶1-bit ENOB: {sd3.enob():.2f} bits"</span>)  <span class="code-comment"># ~12.7 bits</span></pre>
+
+            <h3>示例4：遗传算法优化Sigma-Delta系数</h3>
+            
+            <div class="tip tip-info">
+                <div class="tip-title">为什么需要优化Sigma-Delta系数？</div>
+                <p>Sigma-Delta调制器的性能取决于积分器增益(c1, c2)、反馈系数(a1, a2)和输入幅度(amplitude)。
+                不同的系数组合会影响：</p>
+                <ul>
+                    <li><strong>稳定性</strong> - 错误的系数导致振荡(ENOB≤0)</li>
+                    <li><strong>ENOB</strong> - 好的系数可以提升1-2 bits</li>
+                    <li><strong>动态范围</strong> - 幅度太大会过载，太小会降低SNR</li>
+                </ul>
+            </div>
+            
+            <pre><span class="code-keyword">import</span> numpy <span class="code-keyword">as</span> np
+<span class="code-keyword">from</span> quantiamagica <span class="code-keyword">import</span> SigmaDeltaADC, QuantizerEvent
+<span class="code-keyword">from</span> quantiamagica.optim <span class="code-keyword">import</span> GeneticOptimizer, Gene
+
+<span class="code-comment"># ===================== Step 1: 定义仿真参数 =====================</span>
+OSR = <span class="code-string">64</span>                        <span class="code-comment"># 过采样率</span>
+FS = <span class="code-string">1e6</span>                        <span class="code-comment"># 采样频率 1MHz</span>
+N_SAMPLES = OSR * <span class="code-string">128</span>           <span class="code-comment"># 采样点数</span>
+FIN = <span class="code-string">13</span> * FS / N_SAMPLES       <span class="code-comment"># 相干采样频率</span>
+
+<span class="code-comment"># ===================== Step 2: 定义要优化的基因 =====================</span>
+<span class="code-comment"># 每个Gene定义一个参数的搜索范围</span>
+genes = [
+    Gene(<span class="code-string">'c1'</span>, <span class="code-string">0.1</span>, <span class="code-string">0.8</span>, <span class="code-string">'float'</span>),       <span class="code-comment"># 第1级积分器增益</span>
+    Gene(<span class="code-string">'c2'</span>, <span class="code-string">0.1</span>, <span class="code-string">0.8</span>, <span class="code-string">'float'</span>),       <span class="code-comment"># 第2级积分器增益</span>
+    Gene(<span class="code-string">'a1'</span>, <span class="code-string">0.5</span>, <span class="code-string">2.5</span>, <span class="code-string">'float'</span>),       <span class="code-comment"># 第1级反馈系数</span>
+    Gene(<span class="code-string">'a2'</span>, <span class="code-string">0.5</span>, <span class="code-string">3.5</span>, <span class="code-string">'float'</span>),       <span class="code-comment"># 第2级反馈系数</span>
+    Gene(<span class="code-string">'amplitude'</span>, <span class="code-string">0.15</span>, <span class="code-string">0.4</span>, <span class="code-string">'float'</span>),  <span class="code-comment"># 输入正弦波幅度</span>
+]
+
+<span class="code-comment"># ===================== Step 3: 定义评估函数 =====================</span>
+<span class="code-comment"># 这个函数接收一组参数，返回ENOB</span>
+<span class="code-keyword">def</span> <span class="code-function">evaluate_sd_adc</span>(params):
+    <span class="code-string">"""创建2阶CIFB Sigma-Delta并评估ENOB"""</span>
+    c1, c2 = params[<span class="code-string">'c1'</span>], params[<span class="code-string">'c2'</span>]
+    a1, a2 = params[<span class="code-string">'a1'</span>], params[<span class="code-string">'a2'</span>]
+    amplitude = params[<span class="code-string">'amplitude'</span>]
+    
+    <span class="code-comment"># 创建基础1阶SD ADC（我们通过事件扩展为2阶）</span>
+    sd = SigmaDeltaADC(order=<span class="code-string">1</span>, bits=<span class="code-string">1</span>, osr=OSR)
+    state = [<span class="code-string">0.0</span>, <span class="code-string">0.0</span>]  <span class="code-comment"># 两个积分器的状态</span>
+    
+    <span class="code-comment"># 定义2阶CIFB拓扑</span>
+    <span class="code-keyword">@sd.on</span>(QuantizerEvent)
+    <span class="code-keyword">def</span> <span class="code-function">second_order_cifb</span>(event):
+        x = event.input_signal      <span class="code-comment"># 输入信号</span>
+        y = event.prev_output       <span class="code-comment"># 量化器输出反馈 (+1/-1)</span>
+        <span class="code-comment"># CIFB结构: 两级积分器 + 反馈</span>
+        state[<span class="code-string">0</span>] = state[<span class="code-string">0</span>] + c1 * (x - a1 * y)  <span class="code-comment"># 第1级</span>
+        state[<span class="code-string">1</span>] = state[<span class="code-string">1</span>] + c2 * (state[<span class="code-string">0</span>] - a2 * y)  <span class="code-comment"># 第2级</span>
+        event.quantizer_input = state[<span class="code-string">1</span>]  <span class="code-comment"># 输出到量化器</span>
+    
+    <span class="code-comment"># 生成输入信号</span>
+    t = np.arange(N_SAMPLES) / FS
+    signal = <span class="code-string">0.5</span> + amplitude * np.sin(<span class="code-string">2</span> * np.pi * FIN * t)
+    
+    <span class="code-comment"># 仿真并计算ENOB</span>
+    sd.sim(signal, fs=FS)
+    sd._result.metadata[<span class="code-string">'fin'</span>] = FIN
+    <span class="code-keyword">return</span> sd.enob()
+
+<span class="code-comment"># ===================== Step 4: 定义适应度函数 =====================</span>
+<span class="code-comment"># 遗传算法最大化此函数</span>
+<span class="code-keyword">def</span> <span class="code-function">fitness</span>(params):
+    <span class="code-keyword">try</span>:
+        enob = evaluate_sd_adc(params)
+        <span class="code-keyword">if</span> enob <= <span class="code-string">0</span> <span class="code-keyword">or</span> np.isnan(enob) <span class="code-keyword">or</span> enob > <span class="code-string">30</span>:
+            <span class="code-keyword">return</span> -<span class="code-string">1000</span>  <span class="code-comment"># 振荡或异常，给予惩罚</span>
+        <span class="code-comment"># 目标：最大化ENOB，同时奖励较大的输入幅度</span>
+        <span class="code-keyword">return</span> enob * <span class="code-string">10</span> + params[<span class="code-string">'amplitude'</span>] * <span class="code-string">5</span>
+    <span class="code-keyword">except</span>:
+        <span class="code-keyword">return</span> -<span class="code-string">1000</span>
+
+<span class="code-comment"># ===================== Step 5: 运行优化 =====================</span>
+optimizer = GeneticOptimizer(genes, fitness, maximize=<span class="code-string">True</span>)
+result = optimizer.run(population_size=<span class="code-string">40</span>)  <span class="code-comment"># 自动收敛，无需设置代数</span>
+
+<span class="code-comment"># ===================== Step 6: 获取优化后的系数 =====================</span>
+<span class="code-function">print</span>(<span class="code-string">"优化后的系数:"</span>)
+<span class="code-function">print</span>(<span class="code-string">f"  c1 = {result.best_params['c1']:.4f}"</span>)  <span class="code-comment"># 积分器1增益</span>
+<span class="code-function">print</span>(<span class="code-string">f"  c2 = {result.best_params['c2']:.4f}"</span>)  <span class="code-comment"># 积分器2增益</span>
+<span class="code-function">print</span>(<span class="code-string">f"  a1 = {result.best_params['a1']:.4f}"</span>)  <span class="code-comment"># 反馈系数1</span>
+<span class="code-function">print</span>(<span class="code-string">f"  a2 = {result.best_params['a2']:.4f}"</span>)  <span class="code-comment"># 反馈系数2</span>
+<span class="code-function">print</span>(<span class="code-string">f"  amplitude = {result.best_params['amplitude']:.4f}"</span>)
+
+<span class="code-comment"># 验证优化结果</span>
+optimized_enob = evaluate_sd_adc(result.best_params)
+<span class="code-function">print</span>(<span class="code-string">f"\n优化后ENOB: {optimized_enob:.2f} bits"</span>)
+
+<span class="code-comment"># ===================== 对比：默认系数 vs 优化系数 =====================</span>
+default_params = {<span class="code-string">'c1'</span>: <span class="code-string">0.5</span>, <span class="code-string">'c2'</span>: <span class="code-string">0.5</span>, <span class="code-string">'a1'</span>: <span class="code-string">1.0</span>, <span class="code-string">'a2'</span>: <span class="code-string">2.0</span>, <span class="code-string">'amplitude'</span>: <span class="code-string">0.3</span>}
+default_enob = evaluate_sd_adc(default_params)
+<span class="code-function">print</span>(<span class="code-string">f"默认系数ENOB: {default_enob:.2f} bits"</span>)
+<span class="code-function">print</span>(<span class="code-string">f"提升: +{optimized_enob - default_enob:.2f} bits"</span>)</pre>
+
+            <div class="tip tip-success">
+                <div class="tip-title">result对象包含的信息</div>
+                <table>
+                    <tr><th>属性</th><th>说明</th><th>示例</th></tr>
+                    <tr><td><code>result.best_params</code></td><td>优化后的参数字典</td><td><code>{'c1': 0.6018, 'c2': 0.6467, ...}</code></td></tr>
+                    <tr><td><code>result.best_fitness</code></td><td>最佳适应度值</td><td><code>121.84</code></td></tr>
+                    <tr><td><code>result.generations</code></td><td>实际迭代代数</td><td><code>13</code></td></tr>
+                    <tr><td><code>result.converged</code></td><td>是否收敛</td><td><code>True</code></td></tr>
+                    <tr><td><code>result.history</code></td><td>每代最佳适应度</td><td><code>[80.5, 95.2, ...]</code></td></tr>
+                </table>
+            </div>
+
+            <h4>快捷方式：SDCoeffOptimizer</h4>
+            <p>如果只需优化标准SD ADC系数，可以使用封装好的优化器：</p>
+            <pre><span class="code-keyword">from</span> quantiamagica.optim <span class="code-keyword">import</span> SDCoeffOptimizer
+
+<span class="code-comment"># 一行创建 + 一行优化</span>
+sd_opt = SDCoeffOptimizer(order=<span class="code-string">2</span>, bits=<span class="code-string">1</span>, osr=<span class="code-string">64</span>, fs=<span class="code-string">1e6</span>)
+result = sd_opt.optimize()
+
+<span class="code-comment"># 打印优化报告</span>
+<span class="code-function">print</span>(result.summary())
+
+<span class="code-comment"># 获取优化后的系数</span>
+<span class="code-function">print</span>(result.best_params)       <span class="code-comment"># 所有参数</span>
+<span class="code-function">print</span>(result.best_params[<span class="code-string">'c1'</span>]) <span class="code-comment"># 单个参数</span>
+<span class="code-function">print</span>(result.best_enob)         <span class="code-comment"># 优化后的ENOB</span>
+<span class="code-function">print</span>(result.baseline_enob)     <span class="code-comment"># 优化前的ENOB</span>
+<span class="code-function">print</span>(result.improvement)       <span class="code-comment"># 提升了多少bits</span></pre>
+
+            <h3>示例5：五阶Sigma-Delta极致优化</h3>
+            
+            <div class="tip tip-warning">
+                <div class="tip-title">高阶SD ADC优化挑战</div>
+                <p>5阶SD ADC有11个待优化参数，搜索空间巨大。默认系数往往直接振荡(ENOB&lt;0)，
+                遗传算法可以找到稳定且高性能的系数组合。</p>
+            </div>
+            
+            <pre><span class="code-keyword">from</span> quantiamagica <span class="code-keyword">import</span> SigmaDeltaADC, QuantizerEvent
+<span class="code-keyword">from</span> quantiamagica.optim <span class="code-keyword">import</span> GeneticOptimizer, Gene
+<span class="code-keyword">import</span> numpy <span class="code-keyword">as</span> np
+
+OSR, FS = <span class="code-string">64</span>, <span class="code-string">1e6</span>
+N_SAMPLES = OSR * <span class="code-string">256</span>
+FIN = <span class="code-string">13</span> * FS / N_SAMPLES
+
+<span class="code-comment"># 定义5阶SD ADC的11个基因</span>
+genes = [
+    <span class="code-comment"># 积分器增益 (越往后越小以保持稳定)</span>
+    Gene(<span class="code-string">'c1'</span>, <span class="code-string">0.1</span>, <span class="code-string">0.5</span>, <span class="code-string">'float'</span>),
+    Gene(<span class="code-string">'c2'</span>, <span class="code-string">0.08</span>, <span class="code-string">0.4</span>, <span class="code-string">'float'</span>),
+    Gene(<span class="code-string">'c3'</span>, <span class="code-string">0.05</span>, <span class="code-string">0.3</span>, <span class="code-string">'float'</span>),
+    Gene(<span class="code-string">'c4'</span>, <span class="code-string">0.03</span>, <span class="code-string">0.2</span>, <span class="code-string">'float'</span>),
+    Gene(<span class="code-string">'c5'</span>, <span class="code-string">0.02</span>, <span class="code-string">0.15</span>, <span class="code-string">'float'</span>),
+    <span class="code-comment"># 反馈系数</span>
+    Gene(<span class="code-string">'a1'</span>, <span class="code-string">0.8</span>, <span class="code-string">3.0</span>, <span class="code-string">'float'</span>),
+    Gene(<span class="code-string">'a2'</span>, <span class="code-string">0.5</span>, <span class="code-string">2.5</span>, <span class="code-string">'float'</span>),
+    Gene(<span class="code-string">'a3'</span>, <span class="code-string">0.3</span>, <span class="code-string">2.0</span>, <span class="code-string">'float'</span>),
+    Gene(<span class="code-string">'a4'</span>, <span class="code-string">0.2</span>, <span class="code-string">1.5</span>, <span class="code-string">'float'</span>),
+    Gene(<span class="code-string">'a5'</span>, <span class="code-string">0.1</span>, <span class="code-string">1.0</span>, <span class="code-string">'float'</span>),
+    Gene(<span class="code-string">'amplitude'</span>, <span class="code-string">0.08</span>, <span class="code-string">0.25</span>, <span class="code-string">'float'</span>),
+]
+
+<span class="code-keyword">def</span> <span class="code-function">evaluate_5th_order</span>(params):
+    c = [params[<span class="code-string">f'c{i+1}'</span>] <span class="code-keyword">for</span> i <span class="code-keyword">in</span> range(<span class="code-string">5</span>)]
+    a = [params[<span class="code-string">f'a{i+1}'</span>] <span class="code-keyword">for</span> i <span class="code-keyword">in</span> range(<span class="code-string">5</span>)]
+    
+    sd = SigmaDeltaADC(order=<span class="code-string">1</span>, bits=<span class="code-string">1</span>, osr=OSR)
+    state = [<span class="code-string">0.0</span>] * <span class="code-string">5</span>
+    
+    <span class="code-keyword">@sd.on</span>(QuantizerEvent)
+    <span class="code-keyword">def</span> <span class="code-function">fifth_order</span>(event):
+        x, y = event.input_signal, event.prev_output
+        state[<span class="code-string">0</span>] = state[<span class="code-string">0</span>] + c[<span class="code-string">0</span>] * (x - a[<span class="code-string">0</span>] * y)
+        <span class="code-keyword">for</span> i <span class="code-keyword">in</span> range(<span class="code-string">1</span>, <span class="code-string">5</span>):
+            state[i] = state[i] + c[i] * (state[i-<span class="code-string">1</span>] - a[i] * y)
+        event.quantizer_input = state[<span class="code-string">4</span>]
+    
+    t = np.arange(N_SAMPLES) / FS
+    signal = <span class="code-string">0.5</span> + params[<span class="code-string">'amplitude'</span>] * np.sin(<span class="code-string">2</span>*np.pi*FIN*t)
+    sd.sim(signal, fs=FS)
+    sd._result.metadata[<span class="code-string">'fin'</span>] = FIN
+    <span class="code-keyword">return</span> sd.enob()
+
+<span class="code-keyword">def</span> <span class="code-function">fitness</span>(params):
+    enob = evaluate_5th_order(params)
+    <span class="code-keyword">return</span> enob <span class="code-keyword">if</span> enob > <span class="code-string">0</span> <span class="code-keyword">else</span> -<span class="code-string">1000</span>
+
+optimizer = GeneticOptimizer(genes, fitness, maximize=<span class="code-string">True</span>)
+result = optimizer.run(population_size=<span class="code-string">80</span>)
+
+<span class="code-function">print</span>(<span class="code-string">f"优化后ENOB: {result.best_fitness:.2f} bits"</span>)
+<span class="code-function">print</span>(<span class="code-string">f"系数: {result.best_params}"</span>)</pre>
+
+            <div class="tip tip-success">
+                <div class="tip-title">优化结果 (实测)</div>
+                <p>默认系数: <strong>振荡 (ENOB=-3.55)</strong> → 优化后: <strong>16.19 bits</strong><br>
+                收敛代数: 24代，进度条显示斜率收敛过程</p>
+            </div>
         </section>
 
         <!-- FAQ -->

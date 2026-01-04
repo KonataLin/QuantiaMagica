@@ -210,15 +210,17 @@ input_signal = offset + amplitude * np.sin(2 * np.pi * fin_coherent * t)
 
 
 # =============================================================================
-# 1. 标准SAR ADC (理想数学模型)
+# 1. 标准SAR ADC (使用原生SARADC)
 # =============================================================================
 
 print("\n" + "-" * 60)
-print("1. Standard SAR ADC")
+print("1. Standard SAR ADC (原生SARADC)")
 print("-" * 60)
 
-# 标准量化 (无噪声整形，使用round居中量化)
-std_codes = simulate_standard_adc(input_signal, BITS, vref=1.0)
+# 使用原生SARADC
+std_adc = SARADC(bits=BITS, vref=1.0)
+std_adc.sim(input_signal, fs=FS)
+std_codes = std_adc._result.output_codes
 
 # 全带宽和带内SNR
 std_fullband_snr, std_fullband_enob = compute_inband_snr(
@@ -233,14 +235,14 @@ print(f"  带内 SNR:    {std_inband_snr:.1f} dB  (ENOB = {std_inband_enob:.2f})
 
 
 # =============================================================================
-# 2. NS-SAR ADC (理想数学模型)
+# 2. NS-SAR ADC (理想数学模型 - 噪声整形)
 # =============================================================================
 
 print("\n" + "-" * 60)
 print("2. Noise-Shaping SAR ADC (1st order)")
 print("-" * 60)
 
-# 使用理想NS-SAR模型
+# 使用理想NS-SAR模型 (数学等效，更精确的噪声整形)
 ns_codes = simulate_ns_sar_ideal(input_signal, BITS, vref=1.0, feedback_coeff=1.0)
 
 # 全带宽和带内SNR

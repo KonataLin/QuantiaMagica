@@ -54,8 +54,12 @@ for info in pipeline.get_stage_info():
     print(f"  Stage {info['index']}: {info['bits']} bits, "
           f"gain={info['gain']:.1f}, redundancy={info['redundancy']}")
 
-# Run simulation
-result = pipeline.sim(n_samples=1024, fs=10e6, fin=100e3)
+# Auto-optimize test parameters
+opt_result = pipeline.sim_auto(fs=10e6)
+
+print(f"\nOptimal Parameters:")
+print(f"  fin: {opt_result['best_fin']:.2f} Hz")
+print(f"  amplitude: {opt_result['best_amplitude']:.4f} V")
 
 print(f"\nPerformance:")
 print(f"  ENOB: {pipeline.enob():.2f} bits")
@@ -190,6 +194,7 @@ ax2.grid(True, alpha=0.3)
 
 # Time domain
 ax3 = axes[1, 0]
+result = pipeline._result
 t = result.timestamps * 1e6
 ax3.plot(t[:100], result.input_signal[:100], 'b-', label='Input', linewidth=1)
 ax3.plot(t[:100], result.reconstructed[:100], 'r--', label='Output', linewidth=1)

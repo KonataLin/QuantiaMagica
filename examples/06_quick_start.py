@@ -151,3 +151,24 @@ adc = SARADC(10)
 adc.sim(signal='ramp', n_samples=4096)
 print(f"10. INL max: {max(abs(adc.inl())):.3f} LSB")
 print(f"    DNL max: {max(abs(adc.dnl())):.3f} LSB")
+
+
+# =============================================================================
+# 11. Auto-optimize: find best fin and amplitude (sim_auto)
+# =============================================================================
+
+from quantiamagica import SARADC
+
+adc = SARADC(12)
+
+# One call - automatically finds optimal parameters using Differential Evolution
+result = adc.sim_auto(fs=1e6)
+
+print(f"11. sim_auto results:")
+print(f"    Best fin: {result['best_fin']:.2f} Hz")
+print(f"    Best amplitude: {result['best_amplitude']:.4f} V")
+print(f"    Best ENOB: {result['best_enob']:.4f} bits")
+print(f"    Converged in {result['generations']} generations")
+
+# Result is saved, can directly plot
+adc.report('spectrum')

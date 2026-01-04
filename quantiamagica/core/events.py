@@ -29,9 +29,12 @@ from typing import (
     TypeVar,
     Generic,
     Union,
+    Set,
 )
 from functools import wraps
 import weakref
+import bisect
+import warnings
 
 
 class EventPriority(IntEnum):
@@ -147,6 +150,11 @@ class EventBus:
     Manages event handler registration and dispatching. Handlers are
     called in priority order when events are fired.
     
+    Optimizations:
+    - 缓存事件类型层次结构，避免重复isinstance检查
+    - 使用bisect进行O(log n)插入
+    - 预计算处理器列表
+    
     Attributes
     ----------
     handlers : Dict[Type[Event], List[HandlerInfo]]
@@ -163,10 +171,14 @@ class EventBus:
     >>> bus.fire(SamplingEvent(voltage=0.5))
     """
     
+    __slots__ = ('_handlers', '_event_log', '_logging_enabled', '_type_cache', '_handler_cache_valid')
+    
     def __init__(self):
         self._handlers: Dict[Type[Event], List[HandlerInfo]] = {}
         self._event_log: List[Event] = []
         self._logging_enabled: bool = False
+        self._type_cache: Dict[Type[Event], List[Type[Event]]] = {}
+        self._handler_cache_valid: bool = True
     
     def on(
         self,
@@ -238,8 +250,14 @@ class EventBus:
             owner=owner_ref,
         )
         
-        self._handlers[event_type].append(info)
-        self._handlers[event_type].sort(key=lambda h: h.priority)
+        # 使用bisect进行O(log n)插入，保持排序
+        handlers = self._handlers[event_type]
+        priorities = [h.priority for h in handlers]
+        insert_pos = bisect.bisect_right(priorities, priority)
+        handlers.insert(insert_pos, info)
+        
+        # 清除类型缓存
+        self._type_cache.clear()
     
     def unregister(
         self,
@@ -268,7 +286,10 @@ class EventBus:
         self._handlers[event_type] = [
             h for h in self._handlers[event_type] if h.callback != callback
         ]
-        return len(self._handlers[event_type]) < original_len
+        if len(self._handlers[event_type]) < original_len:
+            self._type_cache.clear()
+            return True
+        return False
     
     def unregister_all(self, owner: Any = None) -> int:
         """
@@ -296,7 +317,23 @@ class EventBus:
                     if h.owner is None or h.owner() != owner
                 ]
                 count += original_len - len(self._handlers[event_type])
+        if count > 0:
+            self._type_cache.clear()
         return count
+    
+    def _get_matching_types(self, event_type: Type[Event]) -> List[Type[Event]]:
+        """
+        获取所有匹配的事件类型（使用缓存）
+        
+        缓存事件类型的层次结构，避免重复isinstance检查。
+        """
+        if event_type in self._type_cache:
+            return self._type_cache[event_type]
+        
+        # 计算所有匹配的注册事件类型
+        matching = [etype for etype in self._handlers if issubclass(event_type, etype)]
+        self._type_cache[event_type] = matching
+        return matching
     
     def fire(self, event: Event) -> Event:
         """
@@ -320,23 +357,37 @@ class EventBus:
         
         event_type = type(event)
         
-        for etype in self._handlers:
-            if isinstance(event, etype):
-                for handler_info in self._handlers[etype]:
-                    if handler_info.owner is not None and handler_info.owner() is None:
-                        continue
-                    
-                    if isinstance(event, Cancellable):
-                        if event.cancelled and not handler_info.ignore_cancelled:
-                            continue
-                    
-                    try:
-                        handler_info.callback(event)
-                    except Exception as e:
-                        import warnings
-                        warnings.warn(
-                            f"Handler {handler_info.callback.__name__} raised: {e}"
-                        )
+        # 快速路径：没有处理器时直接返回
+        if not self._handlers:
+            return event
+        
+        # 使用缓存获取匹配的事件类型
+        matching_types = self._get_matching_types(event_type)
+        
+        if not matching_types:
+            return event
+        
+        # 预计算是否为Cancellable（避免重复isinstance检查）
+        is_cancellable = isinstance(event, Cancellable)
+        
+        for etype in matching_types:
+            handlers = self._handlers[etype]
+            for handler_info in handlers:
+                # 检查owner是否存活
+                owner_ref = handler_info.owner
+                if owner_ref is not None and owner_ref() is None:
+                    continue
+                
+                # 检查cancelled状态
+                if is_cancellable and event._cancelled and not handler_info.ignore_cancelled:
+                    continue
+                
+                try:
+                    handler_info.callback(event)
+                except Exception as e:
+                    warnings.warn(
+                        f"Handler {handler_info.callback.__name__} raised: {e}"
+                    )
         
         return event
     

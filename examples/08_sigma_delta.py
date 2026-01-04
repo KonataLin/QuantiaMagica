@@ -42,7 +42,7 @@ if __name__ == "__main__":
     # Parameters
     OSR = 64
     FS = 1e6
-    N_SAMPLES = OSR * 2048
+    N_SAMPLES = OSR * 256  # Reduced for speed (16384 samples)
     FIN = 13 * FS / N_SAMPLES  # Coherent sampling
     
     print(f"\nParameters:")
@@ -65,12 +65,19 @@ if __name__ == "__main__":
     print("1. Basic 1-bit Sigma-Delta")
     print("-" * 60)
     
-    sd1 = SigmaDeltaADC(order=1, bits=1, osr=OSR)
-    sd1.sim(input_signal, fs=FS)
-    sd1._result.metadata['fin'] = FIN  # 存储fin用于ENOB计算
+    # Without sim_auto (manual params)
+    sd1_manual = SigmaDeltaADC(order=1, bits=1, osr=OSR)
+    sd1_manual.sim(input_signal, fs=FS)
+    sd1_manual._result.metadata['fin'] = FIN
+    enob1_manual = sd1_manual.enob()
+    print(f"  Manual:   ENOB={enob1_manual:.2f} bits (fin={FIN:.0f}Hz, amp={amplitude}V)")
     
+    # With sim_auto (use same n_samples for fair comparison)
+    sd1 = SigmaDeltaADC(order=1, bits=1, osr=OSR)
+    opt1 = sd1.sim_auto(fs=FS, n_samples=N_SAMPLES, verbose=False)
     enob1 = sd1.enob()
-    print(f"  ENOB: {enob1:.2f} bits")
+    print(f"  sim_auto: ENOB={enob1:.2f} bits (fin={opt1['best_fin']:.0f}Hz, amp={opt1['best_amplitude']:.3f}V)")
+    print(f"  Improvement: +{enob1 - enob1_manual:.2f} bits")
     print(f"  Theoretical: {sd1.theoretical_enob_gain:.1f} bits")
     
     # =========================================================================
@@ -80,12 +87,19 @@ if __name__ == "__main__":
     print("2. 4-bit Sigma-Delta")
     print("-" * 60)
     
-    sd4 = SigmaDeltaADC(order=1, bits=4, osr=OSR)
-    sd4.sim(input_signal, fs=FS)
-    sd4._result.metadata['fin'] = FIN
+    # Without sim_auto
+    sd4_manual = SigmaDeltaADC(order=1, bits=4, osr=OSR)
+    sd4_manual.sim(input_signal, fs=FS)
+    sd4_manual._result.metadata['fin'] = FIN
+    enob4_manual = sd4_manual.enob()
+    print(f"  Manual:   ENOB={enob4_manual:.2f} bits")
     
+    # With sim_auto
+    sd4 = SigmaDeltaADC(order=1, bits=4, osr=OSR)
+    opt4 = sd4.sim_auto(fs=FS, n_samples=N_SAMPLES, verbose=False)
     enob4 = sd4.enob()
-    print(f"  ENOB: {enob4:.2f} bits")
+    print(f"  sim_auto: ENOB={enob4:.2f} bits")
+    print(f"  Improvement: +{enob4 - enob4_manual:.2f} bits")
     
     # =========================================================================
     # 3. 2阶 Sigma-Delta (更高ENOB)
@@ -94,13 +108,20 @@ if __name__ == "__main__":
     print("3. 2nd-order Sigma-Delta")
     print("-" * 60)
     
-    sd2 = SigmaDeltaADC(order=2, bits=1, osr=OSR)
-    sd2.sim(input_signal, fs=FS)
-    sd2._result.metadata['fin'] = FIN
+    # Without sim_auto
+    sd2_manual = SigmaDeltaADC(order=2, bits=1, osr=OSR)
+    sd2_manual.sim(input_signal, fs=FS)
+    sd2_manual._result.metadata['fin'] = FIN
+    enob2_manual = sd2_manual.enob()
+    print(f"  Manual:   ENOB={enob2_manual:.2f} bits")
     
+    # With sim_auto
+    sd2 = SigmaDeltaADC(order=2, bits=1, osr=OSR)
+    opt2 = sd2.sim_auto(fs=FS, n_samples=N_SAMPLES, verbose=False)
     enob2 = sd2.enob()
-    print(f"  ENOB: {enob2:.2f} bits")
-    print(f"  Theoretical gain: {sd2.theoretical_enob_gain:.1f} bits")
+    print(f"  sim_auto: ENOB={enob2:.2f} bits")
+    print(f"  Improvement: +{enob2 - enob2_manual:.2f} bits")
+    print(f"  Theoretical: {sd2.theoretical_enob_gain:.1f} bits")
     
     # =========================================================================
     # 4. Sigma-Delta with non-idealities (event-driven!)
@@ -239,20 +260,21 @@ if __name__ == "__main__":
     print(f"  理论最大: {theoretical_3rd:.1f} bits")
     
     # =========================================================================
-    # Summary
+    # Summary: sim_auto vs Manual
     # =========================================================================
     print("\n" + "=" * 60)
-    print("Summary")
+    print("Summary: sim_auto vs Manual Parameters")
     print("=" * 60)
-    print(f"\n{'Architecture':<45} {'ENOB':>8}")
-    print("-" * 55)
-    print(f"{'1st-order 1-bit SD, OSR=' + str(OSR):<45} {enob1:>8.2f}")
-    print(f"{'1st-order 4-bit SD, OSR=' + str(OSR):<45} {enob4:>8.2f}")
-    print(f"{'2nd-order CIFB (default), OSR=' + str(OSR):<45} {enob2:>8.2f}")
-    print(f"{'2nd-order CIFF (custom), OSR=' + str(OSR):<45} {enob_ciff:>8.2f}")
-    print(f"{'2nd-order custom, OSR=' + str(OSR):<45} {enob_mash:>8.2f}")
-    print(f"{'3rd-order CIFB (custom), OSR=' + str(OSR):<45} {enob_3rd:>8.2f}")
-    print(f"{'1st-order with non-idealities':<45} {enob_real:>8.2f}")
+    print(f"\n{'Architecture':<30} {'Manual':>10} {'sim_auto':>10} {'Improve':>10}")
+    print("-" * 62)
+    print(f"{'1st-order 1-bit':<30} {enob1_manual:>10.2f} {enob1:>10.2f} {'+' + f'{enob1-enob1_manual:.2f}':>9}")
+    print(f"{'1st-order 4-bit':<30} {enob4_manual:>10.2f} {enob4:>10.2f} {'+' + f'{enob4-enob4_manual:.2f}':>9}")
+    print(f"{'2nd-order CIFB':<30} {enob2_manual:>10.2f} {enob2:>10.2f} {'+' + f'{enob2-enob2_manual:.2f}':>9}")
+    print("-" * 62)
+    print(f"{'2nd-order CIFF (custom)':<30} {'-':>10} {enob_ciff:>10.2f} {'-':>10}")
+    print(f"{'2nd-order MASH (custom)':<30} {'-':>10} {enob_mash:>10.2f} {'-':>10}")
+    print(f"{'3rd-order (custom)':<30} {'-':>10} {enob_3rd:>10.2f} {'-':>10}")
+    print(f"{'1st with non-idealities':<30} {'-':>10} {enob_real:>10.2f} {'-':>10}")
     
     # =========================================================================
     # Plot

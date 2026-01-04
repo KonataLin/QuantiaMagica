@@ -26,18 +26,21 @@ from quantiamagica import SARADC
 # Create a 10-bit SAR ADC with 1V reference
 adc = SARADC(bits=10, vref=1.0)
 
-# Run simulation with default sine wave input
-# This generates a coherent sine wave and converts all samples
-
-result = adc.sim(n_samples=1024, fs=1e6, fin=10e3)
+# Auto-optimize: find best fin and amplitude using Differential Evolution
+# This automatically searches for optimal test parameters
+opt_result = adc.sim_auto(fs=1e6)
 
 # Print basic info
-print(f"ADC: {adc.name}")
+print(f"\nADC: {adc.name}")
 print(f"Resolution: {adc.bits} bits")
 print(f"LSB: {adc.lsb * 1e3:.3f} mV")
-print(f"Samples: {result.n_samples}")
 
-# Quick metrics
+# Optimal parameters found
+print(f"\nOptimal Parameters:")
+print(f"  fin: {opt_result['best_fin']:.2f} Hz")
+print(f"  amplitude: {opt_result['best_amplitude']:.4f} V")
+
+# Quick metrics (using optimized result)
 print(f"\nPerformance:")
 print(f"  ENOB: {adc.enob():.2f} bits")
 print(f"  SNR:  {adc.snr():.2f} dB")

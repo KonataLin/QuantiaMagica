@@ -98,6 +98,17 @@ from .plotting import (
     plot_time_domain_jssc,
 )
 
+from .optim import (
+    Gene,
+    GeneType,
+    Individual,
+    Population,
+    GeneticOptimizer,
+    Constraint,
+    RangeConstraint,
+    CustomConstraint,
+)
+
 __all__ = [
     # Version
     "__version__",
@@ -156,4 +167,13 @@ __all__ = [
     "plot_spectrum_jssc",
     "plot_inl_dnl_jssc",
     "plot_time_domain_jssc",
+    # Optimization
+    "Gene",
+    "GeneType",
+    "Individual",
+    "Population",
+    "GeneticOptimizer",
+    "Constraint",
+    "RangeConstraint",
+    "CustomConstraint",
 ]
