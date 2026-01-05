@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuantiaMagica IDE</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Monaco CSS will be loaded by JS -->
+</head>
+<body style="background:#1e1e1e;color:#ccc;">
+    <!-- 加载提示 -->
+    <div id="loading-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#1e1e1e;display:flex;align-items:center;justify-content:center;z-index:9999;">
+        <div style="text-align:center;">
+            <div style="font-size:48px;font-weight:bold;background:linear-gradient(135deg,#0078d4,#00b4d8);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">QM</div>
+            <div style="margin-top:16px;color:#888;">正在加载编辑器...</div>
+        </div>
+    </div>
+    <!-- 顶部工具栏 -->
+    <header class="toolbar">
+        <div class="toolbar-left">
+            <span class="logo">QM</span>
+            <span class="title">QuantiaMagica IDE</span>
+        </div>
+        <div class="toolbar-center">
+            <button class="tool-btn" id="btn-new-file" title="新建文件 (Ctrl+N)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="12" y1="18" x2="12" y2="12"></line>
+                    <line x1="9" y1="15" x2="15" y2="15"></line>
+                </svg>
+            </button>
+            <button class="tool-btn" id="btn-new-folder" title="新建文件夹">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    <line x1="12" y1="11" x2="12" y2="17"></line>
+                    <line x1="9" y1="14" x2="15" y2="14"></line>
+                </svg>
+            </button>
+            <button class="tool-btn" id="btn-save" title="保存 (Ctrl+S)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                </svg>
+            </button>
+            <div class="separator"></div>
+            <button class="tool-btn run-btn" id="btn-run" title="运行 (F5)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+                <span>运行</span>
+            </button>
+            <button class="tool-btn" id="btn-stop" title="停止" style="display:none;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="6" y="6" width="12" height="12"></rect>
+                </svg>
+            </button>
+        </div>
+        <div class="toolbar-right">
+            <button class="tool-btn" id="btn-open-folder" title="打开文件夹">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span>打开文件夹</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- 主体区域 -->
+    <main class="main-container">
+        <!-- 侧边栏 - 文件浏览器 -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-title">资源管理器</span>
+                <button class="icon-btn" id="btn-refresh" title="刷新">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="workspace-path" id="workspace-path">未打开文件夹</div>
+            <div class="file-tree" id="file-tree"></div>
+        </aside>
+
+        <!-- 分隔条 -->
+        <div class="resizer" id="sidebar-resizer"></div>
+
+        <!-- 编辑器区域 -->
+        <div class="editor-area">
+            <!-- 标签栏 -->
+            <div class="tab-bar" id="tab-bar">
+                <div class="tabs" id="tabs"></div>
+            </div>
+            
+            <!-- Monaco编辑器 -->
+            <div class="editor-container" id="editor-container"></div>
+            
+            <!-- 底部分隔条 -->
+            <div class="resizer-h" id="terminal-resizer"></div>
+            
+            <!-- 终端/输出 -->
+            <div class="terminal-panel" id="terminal-panel">
+                <div class="terminal-header">
+                    <span class="terminal-title">输出</span>
+                    <button class="icon-btn" id="btn-clear-terminal" title="清空">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="terminal-content" id="terminal-content"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 状态栏 -->
+    <footer class="statusbar">
+        <div class="status-left">
+            <span id="status-file">就绪</span>
+        </div>
+        <div class="status-right">
+            <span id="status-cursor">行 1, 列 1</span>
+            <span class="separator">|</span>
+            <span id="status-encoding">UTF-8</span>
+            <span class="separator">|</span>
+            <span id="status-lang">Python</span>
+        </div>
+    </footer>
+
+    <!-- 模态框: 打开文件夹 -->
+    <div class="modal" id="modal-open-folder" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>打开文件夹</span>
+                <button class="modal-close" onclick="closeModal('modal-open-folder')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label>输入文件夹路径:</label>
+                <input type="text" id="input-folder-path" placeholder="例如: D:\Projects\MyADC" class="modal-input">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('modal-open-folder')">取消</button>
+                <button class="btn btn-primary" onclick="openFolder()">打开</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框: 新建文件 -->
+    <div class="modal" id="modal-new-file" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="modal-new-title">新建文件</span>
+                <button class="modal-close" onclick="closeModal('modal-new-file')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label>名称:</label>
+                <input type="text" id="input-new-name" placeholder="example.py" class="modal-input">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('modal-new-file')">取消</button>
+                <button class="btn btn-primary" onclick="createNew()">创建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右键菜单 -->
+    <div class="context-menu" id="context-menu" style="display:none;">
+        <div class="context-item" data-action="new-file">新建文件</div>
+        <div class="context-item" data-action="new-folder">新建文件夹</div>
+        <div class="context-separator"></div>
+        <div class="context-item" data-action="rename">重命名</div>
+        <div class="context-item" data-action="delete">删除</div>
+    </div>
+
+    <!-- Qt WebChannel (for desktop app) -->
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <!-- Monaco Editor CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

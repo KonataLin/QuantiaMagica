@@ -125,12 +125,12 @@ def main():
     
     optimizer = GeneticOptimizer(genes, fitness, maximize=True)
     result = optimizer.run(
-        population_size=200,       # 大种群充分探索11维空间
+        population_size=300,       # 大种群充分探索11维空间
         max_generations=500,       # 足够迭代
         mutation_rate=0.18,        # 适中变异率
         mutation_strength=0.2,     # 适中变异强度
         crossover_rate=0.75,       # 高交叉率
-        elite_ratio=0.08,          # 保留8%精英
+        elite_ratio=0.10,          # 保留8%精英
         slope_threshold=0.0002,    # 严格收敛条件
         seed=2024                  # 固定种子
     )

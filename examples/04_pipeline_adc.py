@@ -1,12 +1,11 @@
 """
-Example 04: Pipeline ADC Simulation
-====================================
+Example 04: Pipeline ADC - 3个8-bit SAR串联成24-bit
+=====================================================
 
-This example demonstrates Pipeline ADC usage including:
-- Basic pipeline configuration
-- Custom stage configurations
-- Inter-stage gain error modeling
-- Digital error correction
+本示例展示新的Pipeline类（不继承ADConverter）的使用方法：
+- 使用3个8-bit SAR ADC串联成24-bit高精度Pipeline
+- 级间增益放大事件（InterstageGainEvent）用于注入非理想效应
+- 验证Pipeline功能是否正确达到24位精度
 
 Usage:
     python 04_pipeline_adc.py
@@ -14,211 +13,217 @@ Usage:
 
 import sys
 from pathlib import Path
+import numpy as np
 
-# 添加项目根目录到路径（如果未安装模块）
+# 添加项目根目录到路径
 project_root = Path(__file__).parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from quantiamagica import (
-    PipelineADC,
+    Pipeline,
     SARADC,
     InterstageGainEvent,
     StageEvent,
     ResidueEvent,
-    FlashEvent,
     EventPriority,
 )
 
+
 # =============================================================================
-# Example 1: Basic Pipeline ADC
+# Example 1: 3个8-bit SAR ADC串联成24-bit Pipeline（理想情况）
 # =============================================================================
 
-print("=" * 60)
-print("Example 1: Basic 12-bit Pipeline ADC")
-print("=" * 60)
+print("=" * 70)
+print("Example 1: 3×8-bit SAR → 24-bit Pipeline (理想)")
+print("=" * 70)
 
-# Create a 12-bit pipeline with 4 stages
-pipeline = PipelineADC(
-    bits=12,
-    vref=1.0,
-    stages=4,
-    bits_per_stage=3,
-    redundancy=1,
-    name="12-bit-Pipeline"
+# 创建3个独立的8-bit SAR ADC
+stage1 = SARADC(bits=8, vref=1.0, name="SAR-Stage1")
+stage2 = SARADC(bits=8, vref=1.0, name="SAR-Stage2")
+stage3 = SARADC(bits=8, vref=1.0, name="SAR-Stage3")
+
+# 级间增益 = 2^8 = 256（每级8位）
+# 这样第一级的残差放大256倍后，刚好覆盖第二级的满量程
+pipeline_ideal = Pipeline(
+    stages=[stage1, stage2, stage3],
+    gains=[256.0, 256.0],  # 2个级间增益（3级需要2个）
+    name="24-bit-SAR-Pipeline"
 )
 
-# Print stage configuration
-print("\nStage Configuration:")
-for info in pipeline.get_stage_info():
-    print(f"  Stage {info['index']}: {info['bits']} bits, "
-          f"gain={info['gain']:.1f}, redundancy={info['redundancy']}")
+print(f"\nPipeline配置:")
+print(f"  总位数: {pipeline_ideal.bits} bits")
+print(f"  级数: {pipeline_ideal.num_stages}")
+for info in pipeline_ideal.get_stage_info():
+    print(f"    Stage {info['index']}: {info['adc_name']} ({info['bits']} bits), gain={info['gain']:.0f}")
 
-# Auto-optimize test parameters
-opt_result = pipeline.sim_auto(fs=10e6)
+# 运行仿真（65536样本点以达到24-bit精度验证）
+result = pipeline_ideal.sim(n_samples=65536, fs=1e6, fin=10e3)
 
-print(f"\nOptimal Parameters:")
-print(f"  fin: {opt_result['best_fin']:.2f} Hz")
-print(f"  amplitude: {opt_result['best_amplitude']:.4f} V")
-
-print(f"\nPerformance:")
-print(f"  ENOB: {pipeline.enob():.2f} bits")
-print(f"  SNR:  {pipeline.snr():.2f} dB")
-print(f"  SFDR: {pipeline.sfdr():.2f} dB")
+print(f"\n理想Pipeline性能:")
+print(f"  ENOB: {pipeline_ideal.enob():.2f} bits")
+print(f"  SNR:  {pipeline_ideal.snr():.2f} dB")
+print(f"  SFDR: {pipeline_ideal.sfdr():.2f} dB")
+print(f"  THD:  {pipeline_ideal.thd():.2f} dB")
 
 
 # =============================================================================
-# Example 2: Pipeline with Gain Error
+# Example 2: 添加级间增益误差
 # =============================================================================
 
-print("\n" + "=" * 60)
+print("\n" + "=" * 70)
 print("Example 2: Pipeline with Inter-stage Gain Error")
-print("=" * 60)
+print("=" * 70)
 
-pipeline_error = PipelineADC(bits=12, vref=1.0, stages=4, name="Pipeline-GainError")
+# 重新创建ADC（每个ADC实例只能用于一个Pipeline）
+stage1_err = SARADC(bits=8, vref=1.0, name="SAR-Stage1")
+stage2_err = SARADC(bits=8, vref=1.0, name="SAR-Stage2")
+stage3_err = SARADC(bits=8, vref=1.0, name="SAR-Stage3")
 
+pipeline_error = Pipeline(
+    stages=[stage1_err, stage2_err, stage3_err],
+    gains=[256.0, 256.0],
+    name="24-bit-Pipeline-GainError"
+)
+
+# 监听InterstageGainEvent添加非理想效应
 @pipeline_error.on(InterstageGainEvent)
 def add_gain_error(event):
-    """Model finite opamp gain causing gain error."""
-    # Finite opamp gain of 1000 causes ~0.1% gain error
+    """模拟有限运放增益导致的增益误差"""
+    # 运放增益=1000，导致约0.1%增益误差
     opamp_gain = 1000
     gain_error = 1 - 1/opamp_gain
     event.actual_gain = event.ideal_gain * gain_error
     
-    # Also add some offset
-    event.offset = 0.5e-3  # 0.5mV offset
+    # 添加0.5mV失调
+    event.offset = 0.5e-3
     
-    # And amplifier noise
-    event.noise_sigma = 0.1e-3  # 0.1mV noise
+    # 添加0.1mV噪声
+    event.noise_sigma = 0.1e-3
 
-result_error = pipeline_error.sim(n_samples=1024, fs=10e6, fin=100e3)
+result_error = pipeline_error.sim(n_samples=65536, fs=1e6, fin=10e3)
 
-print(f"With gain error (opamp gain=1000):")
+print(f"带增益误差的Pipeline性能 (opamp gain=1000):")
 print(f"  ENOB: {pipeline_error.enob():.2f} bits")
 print(f"  SNR:  {pipeline_error.snr():.2f} dB")
+print(f"  ENOB损失: {pipeline_ideal.enob() - pipeline_error.enob():.2f} bits")
 
 
 # =============================================================================
-# Example 3: Custom Pipeline from SAR Stages
+# Example 3: 级间监控
 # =============================================================================
 
-print("\n" + "=" * 60)
-print("Example 3: Pipeline with Custom SAR Stages")
-print("=" * 60)
+print("\n" + "=" * 70)
+print("Example 3: Stage-by-Stage Monitoring")
+print("=" * 70)
 
-# Create individual SAR stages
-stage1 = SARADC(bits=4, vref=1.0, name="Stage1-SAR")
-stage2 = SARADC(bits=4, vref=1.0, name="Stage2-SAR")
-stage3 = SARADC(bits=6, vref=1.0, name="Stage3-SAR")
+stage1_mon = SARADC(bits=8, vref=1.0, name="SAR-Stage1")
+stage2_mon = SARADC(bits=8, vref=1.0, name="SAR-Stage2")
+stage3_mon = SARADC(bits=8, vref=1.0, name="SAR-Stage3")
 
-# Add mismatch to stage 1 (using the CapacitorSwitchEvent from stage1's module)
-from quantiamagica import CapacitorSwitchEvent
-
-@stage1.on(CapacitorSwitchEvent)
-def stage1_mismatch(event):
-    event.capacitance_actual *= 1 + np.random.normal(0, 0.01)
-
-# Build pipeline from stages
-custom_pipeline = PipelineADC.from_stages(
-    [stage1, stage2, stage3],
-    gain=4.0,  # 2^(4-2) for 1-bit redundancy
-    name="Custom-SAR-Pipeline"
+pipeline_monitor = Pipeline(
+    stages=[stage1_mon, stage2_mon, stage3_mon],
+    gains=[256.0, 256.0],
+    name="Monitored-Pipeline"
 )
 
-result_custom = custom_pipeline.sim(n_samples=1024, fs=10e6, fin=100e3)
-
-print(f"Custom SAR Pipeline (4+4+6 bits):")
-print(f"  Total bits: {custom_pipeline.bits}")
-print(f"  ENOB: {custom_pipeline.enob():.2f} bits")
-
-
-# =============================================================================
-# Example 4: Stage-by-stage monitoring
-# =============================================================================
-
-print("\n" + "=" * 60)
-print("Example 4: Stage Monitoring")
-print("=" * 60)
-
-pipeline_monitor = PipelineADC(bits=10, vref=1.0, stages=3, name="Monitored-Pipeline")
-
-stage_data = {"voltages": [], "codes": [], "residues": []}
-
+# 使用MONITOR优先级监控每一级的转换（只读，不修改）
 @pipeline_monitor.on(StageEvent, priority=EventPriority.MONITOR)
-def monitor_stage(event):
-    """Log data at each stage."""
-    if event.sample_index == 0:  # Only first sample
-        print(f"  Stage {event.stage_index}: input={event.input_voltage:.4f}V")
+def log_stage(event):
+    """记录每级输入电压"""
+    if event.sample_index == 0:  # 只打印第一个样本
+        print(f"  Stage {event.stage_index}: input={event.input_voltage:.6f}V")
 
 @pipeline_monitor.on(ResidueEvent, priority=EventPriority.MONITOR)
-def monitor_residue(event):
-    """Log residue computation."""
+def log_residue(event):
+    """记录每级残差"""
     if event.source._sample_index == 0:
-        print(f"    -> residue={event.residue:.4f}V")
+        print(f"    → residue={event.residue:.6f}V")
 
-print("\nFirst sample conversion trace:")
-result_monitor = pipeline_monitor.sim(n_samples=100, fs=10e6, fin=100e3)
+@pipeline_monitor.on(InterstageGainEvent, priority=EventPriority.MONITOR)
+def log_gain(event):
+    """记录级间放大"""
+    if event.source._sample_index == 0:
+        amplified = event.input_voltage * event.actual_gain
+        print(f"    → amplified={amplified:.6f}V (gain={event.actual_gain:.0f})")
+
+print("\n第一个采样点的转换过程:")
+result_monitor = pipeline_monitor.sim(n_samples=100, fs=1e6, fin=10e3)
+
+
+# =============================================================================
+# Example 4: 完整报告
+# =============================================================================
+
+print("\n" + "=" * 70)
+print("Example 4: Full Pipeline Report")
+print("=" * 70)
+
+pipeline_ideal.report()
 
 
 # =============================================================================
 # Visualization
 # =============================================================================
 
-print("\n" + "=" * 60)
+print("\n" + "=" * 70)
 print("Generating Plots...")
-print("=" * 60)
+print("=" * 70)
 
-# Plot comparison
 import matplotlib.pyplot as plt
 
 fig, axes = plt.subplots(2, 2, figsize=(12, 10), dpi=150)
-fig.suptitle('Pipeline ADC Analysis', fontsize=14, fontweight='bold')
+fig.suptitle('24-bit Pipeline ADC (3×8-bit SAR) Analysis', fontsize=14, fontweight='bold')
 
-# Ideal pipeline spectrum
+# 理想Pipeline频谱
 ax1 = axes[0, 0]
-freqs, spec, _ = pipeline.spectrum(show=False)
+freqs, spec, _ = pipeline_ideal.spectrum(show=False)
 ax1.plot(freqs/1e3, spec, 'b-', linewidth=0.8)
 ax1.set_xlabel('Frequency (kHz)')
 ax1.set_ylabel('Power (dB)')
-ax1.set_title(f'Ideal Pipeline (ENOB={pipeline.enob():.2f})')
+ax1.set_title(f'Ideal Pipeline (ENOB={pipeline_ideal.enob():.2f} bits)')
 ax1.grid(True, alpha=0.3)
 
-# With gain error spectrum
+# 带增益误差的频谱
 ax2 = axes[0, 1]
 freqs2, spec2, _ = pipeline_error.spectrum(show=False)
 ax2.plot(freqs2/1e3, spec2, 'r-', linewidth=0.8)
 ax2.set_xlabel('Frequency (kHz)')
 ax2.set_ylabel('Power (dB)')
-ax2.set_title(f'With Gain Error (ENOB={pipeline_error.enob():.2f})')
+ax2.set_title(f'With Gain Error (ENOB={pipeline_error.enob():.2f} bits)')
 ax2.grid(True, alpha=0.3)
 
-# Time domain
+# 时域
 ax3 = axes[1, 0]
-result = pipeline._result
+result = pipeline_ideal._result
 t = result.timestamps * 1e6
 ax3.plot(t[:100], result.input_signal[:100], 'b-', label='Input', linewidth=1)
-ax3.plot(t[:100], result.reconstructed[:100], 'r--', label='Output', linewidth=1)
+ax3.plot(t[:100], result.reconstructed[:100], 'r--', label='Reconstructed', linewidth=1)
 ax3.set_xlabel('Time (μs)')
 ax3.set_ylabel('Voltage (V)')
 ax3.set_title('Time Domain (first 100 samples)')
 ax3.legend()
 ax3.grid(True, alpha=0.3)
 
-# Stage configuration bar chart
+# 级配置
 ax4 = axes[1, 1]
-stage_info = pipeline.get_stage_info()
-stage_names = [f'S{i["index"]}' for i in stage_info]
+stage_info = pipeline_ideal.get_stage_info()
+stage_names = [f'Stage {i["index"]}\n({i["adc_name"]})' for i in stage_info]
 stage_bits = [i['bits'] for i in stage_info]
 bars = ax4.bar(stage_names, stage_bits, color='steelblue', alpha=0.8)
 ax4.set_ylabel('Bits')
-ax4.set_title('Bits per Stage')
+ax4.set_title('Bits per Stage (Total = 24 bits)')
 ax4.grid(True, alpha=0.3, axis='y')
 for bar, bits in zip(bars, stage_bits):
-    ax4.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.1,
-            str(bits), ha='center', fontsize=10)
+    ax4.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.2,
+            f'{bits} bits', ha='center', fontsize=10)
 
 plt.tight_layout()
-plt.savefig('pipeline_analysis.png', dpi=150, bbox_inches='tight')
+plt.savefig('pipeline_24bit_analysis.png', dpi=150, bbox_inches='tight')
 plt.show()
 
-print("\nPlots saved to pipeline_analysis.png")
+print("\nPlots saved to pipeline_24bit_analysis.png")
+print("\n" + "=" * 70)
+print("Pipeline重构验证完成！")
+print(f"3个8-bit SAR ADC成功串联成 {pipeline_ideal.bits}-bit Pipeline")
+print("=" * 70)

@@ -15,7 +15,6 @@ from .pipeline import (
     PipelineADC,
     StageEvent,
     ResidueEvent,
-    FlashEvent,
     InterstageGainEvent,
 )
 
@@ -38,7 +37,6 @@ __all__ = [
     "PipelineADC",
     "StageEvent",
     "ResidueEvent",
-    "FlashEvent",
     "InterstageGainEvent",
     # Sigma-Delta ADC
     "SigmaDeltaADC",

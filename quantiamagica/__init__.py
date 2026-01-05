@@ -60,7 +60,6 @@ from .adc.pipeline import (
     PipelineADC,
     StageEvent,
     ResidueEvent,
-    FlashEvent,
     InterstageGainEvent,
 )
 
@@ -109,6 +108,9 @@ from .optim import (
     CustomConstraint,
 )
 
+# IDE
+from .ide import launch as launch_ide
+
 __all__ = [
     # Version
     "__version__",
@@ -133,7 +135,6 @@ __all__ = [
     "PipelineADC",
     "StageEvent",
     "ResidueEvent",
-    "FlashEvent",
     "InterstageGainEvent",
     # Sigma-Delta ADC
     "SigmaDeltaADC",
@@ -176,4 +177,6 @@ __all__ = [
     "Constraint",
     "RangeConstraint",
     "CustomConstraint",
+    # IDE
+    "launch_ide",
 ]
